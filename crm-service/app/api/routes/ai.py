@@ -35,7 +35,18 @@ from app.schemas.segment import SegmentResponse, SegmentRules
 from app.services import ai_service
 from app.services.segmentation import RulesEngine
 
-router = APIRouter()
+def require_openai_key() -> None:
+    """Dependency: answer 503 with a clear message when OPENAI_API_KEY isn't set,
+    instead of silently returning empty AI results."""
+    if not ai_service.is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="AI features are off: OPENAI_API_KEY is not set on the server.",
+        )
+
+
+# Every AI endpoint needs the key; the rest of the CRM works without it.
+router = APIRouter(dependencies=[Depends(require_openai_key)])
 rules_engine = RulesEngine()
 
 

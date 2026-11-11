@@ -25,15 +25,29 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-# Initialise async client once at module load
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
+# The client is created on first use, not at import time: the OpenAI SDK raises
+# if the key is missing, and that would stop the whole app from starting.
+_client: AsyncOpenAI | None = None
+
+
+def is_configured() -> bool:
+    """True when OPENAI_API_KEY is set, i.e. the AI features can be used."""
+    return bool(os.getenv("OPENAI_API_KEY", "").strip())
+
+
+def _get_client() -> AsyncOpenAI:
+    """Return the shared OpenAI client, creating it the first time it's needed."""
+    global _client
+    if _client is None:
+        _client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY", "").strip())
+    return _client
 
 MODEL = "gpt-4o-mini"
 
 
 async def _chat(system: str, user: str) -> str:
     """Thin wrapper: sends a chat completion and returns the content string."""
-    response = await client.chat.completions.create(
+    response = await _get_client().chat.completions.create(
         model=MODEL,
         messages=[
             {"role": "system", "content": system},
