@@ -6,6 +6,7 @@ import { Loader, timeAgo } from '../components/ui'
 const FIELDS = ['total_spent', 'purchase_count', 'last_purchase_date', 'city', 'age', 'gender', 'tags']
 const OPS = ['eq', 'neq', 'gte', 'lte', 'gt', 'lt', 'in', 'not_in', 'days_ago_lte', 'days_ago_gte', 'contains']
 
+// Turn segment rules into readable text, e.g. 'city eq Mumbai AND total_spent gte 2000'.
 const ruleText = (rules) => {
   if (!rules?.conditions?.length) return 'No conditions'
   return rules.conditions
@@ -13,14 +14,17 @@ const ruleText = (rules) => {
     .join(` ${rules.operator} `)
 }
 
+// Segments page: grid of saved segments, plus buttons to build one manually or with AI.
 export default function Segments() {
   const [segments, setSegments] = useState(null)
   const [showAI, setShowAI] = useState(false)
   const [showManual, setShowManual] = useState(false)
 
+  // Reload the list of segments from the API.
   const load = () => getSegments().then((d) => setSegments(Array.isArray(d) ? d : d?.items || [])).catch(() => setSegments([]))
   useEffect(() => { load() }, [])
 
+  // Ask for confirmation, delete the segment, then refresh the list.
   const remove = async (id) => {
     if (!confirm('Delete this segment?')) return
     await deleteSegment(id).catch(() => {})
@@ -73,12 +77,14 @@ export default function Segments() {
   )
 }
 
+// Modal: describe an audience in English, let the AI turn it into rules, preview, then save.
 function AIBuilderModal({ onClose }) {
   const [prompt, setPrompt] = useState('')
   const [result, setResult] = useState(null)
   const [busy, setBusy] = useState(false)
   const [name, setName] = useState('')
 
+  // Send the prompt to the AI and show the generated rules and match count.
   const generate = async () => {
     setBusy(true)
     try {
@@ -91,6 +97,7 @@ function AIBuilderModal({ onClose }) {
     setBusy(false)
   }
 
+  // Save the AI-generated rules as a new segment and close the modal.
   const save = async () => {
     setBusy(true)
     try {
@@ -146,6 +153,7 @@ function AIBuilderModal({ onClose }) {
   )
 }
 
+// Modal: build segment rules by hand (field / operator / value rows joined by AND or OR).
 function ManualBuilderModal({ onClose }) {
   const [name, setName] = useState('')
   const [operator, setOperator] = useState('AND')
@@ -153,6 +161,7 @@ function ManualBuilderModal({ onClose }) {
   const [preview, setPreview] = useState(null)
   const [busy, setBusy] = useState(false)
 
+  // Convert the form rows into the rules JSON the API expects (drops empty rows, splits lists, parses numbers).
   const buildRules = () => ({
     operator,
     conditions: conditions
@@ -165,12 +174,14 @@ function ManualBuilderModal({ onClose }) {
       })),
   })
 
+  // Ask the API how many customers match the current rules, without saving.
   const doPreview = async () => {
     setBusy(true)
     try { setPreview(await previewSegment(buildRules())) } catch { alert('Preview failed') }
     setBusy(false)
   }
 
+  // Save the hand-built rules as a new segment and close the modal.
   const save = async () => {
     setBusy(true)
     try {
@@ -179,6 +190,7 @@ function ManualBuilderModal({ onClose }) {
     } catch { alert('Save failed'); setBusy(false) }
   }
 
+  // Change one field of one condition row.
   const update = (i, key, val) => {
     const next = [...conditions]
     next[i] = { ...next[i], [key]: val }

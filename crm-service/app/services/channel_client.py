@@ -25,6 +25,8 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 CHANNEL_SERVICE_URL = os.getenv("CHANNEL_SERVICE_URL", "http://localhost:8001")
+# Shared secret proving to the channel service that this request came from the CRM
+CALLBACK_SECRET = os.getenv("CALLBACK_SECRET", "")
 
 # Exponential backoff delays in seconds
 RETRY_DELAYS = [1, 2, 4]
@@ -52,6 +54,7 @@ async def send_batch(communications: List[dict]) -> Dict[str, str]:
                 response = await client.post(
                     f"{CHANNEL_SERVICE_URL}/send",
                     json=communications,
+                    headers={"X-Callback-Secret": CALLBACK_SECRET},
                 )
                 if response.status_code == 200:
                     # Mark all as accepted on batch success

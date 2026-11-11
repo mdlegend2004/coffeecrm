@@ -3,7 +3,7 @@
 # Deploy all 3 resources at once:
 #   Render Dashboard → New → Blueprint → connect this repo
 #
-# Env vars like OPENAI_API_KEY must be set manually in the dashboard
+# Env vars like OPENAI_API_KEY and APP_PASSWORD must be set manually in the dashboard
 # (they are marked sync: false so Render won't overwrite them).
 
 databases:
@@ -28,6 +28,12 @@ services:
           property: connectionString
       - key: OPENAI_API_KEY
         sync: false       # set manually in dashboard
+      - key: APP_PASSWORD
+        sync: false       # set manually — the password your browser will ask for
+      - key: APP_USERNAME
+        value: admin
+      - key: CALLBACK_SECRET
+        generateValue: true   # random secret shared with brewco-channel (below)
       - key: CHANNEL_SERVICE_URL
         fromService:
           type: web
@@ -57,5 +63,10 @@ services:
           type: web
           name: brewco-crm
           envVarKey: RENDER_EXTERNAL_URL
+      - key: CALLBACK_SECRET
+        fromService:
+          type: web
+          name: brewco-crm
+          envVarKey: CALLBACK_SECRET
       - key: PYTHON_VERSION
         value: "3.11.9"

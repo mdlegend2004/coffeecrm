@@ -13,6 +13,7 @@ from pydantic import BaseModel, EmailStr, ConfigDict
 
 
 class CustomerCreate(BaseModel):
+    """Body for creating a customer (single or bulk). Email must be valid and unique."""
     name: str
     email: EmailStr
     phone: Optional[str] = None
@@ -35,6 +36,7 @@ class OrderSummary(BaseModel):
 
 
 class CustomerResponse(BaseModel):
+    """A customer as returned by the API; `orders` is filled only on the detail endpoint."""
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
@@ -51,8 +53,21 @@ class CustomerResponse(BaseModel):
     created_at: datetime
     orders: Optional[List[OrderSummary]] = None
 
+    @classmethod
+    def from_customer(cls, customer, orders=None) -> "CustomerResponse":
+        """Build a response from a Customer row using only its plain columns.
+
+        Reading `customer.orders` directly would make SQLAlchemy lazy-load the
+        relationship, which crashes under async (MissingGreenlet). Pass the
+        orders in explicitly when you have them.
+        """
+        data = {col.key: getattr(customer, col.key) for col in customer.__table__.columns}
+        data["orders"] = [OrderSummary.model_validate(o) for o in orders] if orders is not None else None
+        return cls.model_validate(data)
+
 
 class CustomerListResponse(BaseModel):
+    """One page of customers plus the total match count for pagination."""
     items: List[CustomerResponse]
     total: int
     page: int

@@ -16,6 +16,7 @@ from app.db.database import Base
 
 
 class Segment(Base):
+    """A saved audience: JSON `rules` evaluated by RulesEngine, plus a cached customer_count."""
     __tablename__ = "segments"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict
 
 
 class CampaignCreate(BaseModel):
+    """Body for POST /api/campaigns. Use {name} in message_template for personalisation."""
     name: str
     segment_id: Optional[UUID] = None
     channel: str
@@ -22,6 +23,7 @@ class CampaignCreate(BaseModel):
 
 
 class CampaignResponse(BaseModel):
+    """A campaign as returned by the API."""
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
@@ -36,6 +38,7 @@ class CampaignResponse(BaseModel):
 
 
 class CampaignStatsResponse(BaseModel):
+    """Funnel counts (sent, delivered, failed, opened, clicked, converted) and their rates."""
     campaign_id: UUID
     name: str
     channel: str

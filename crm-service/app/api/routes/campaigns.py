@@ -29,6 +29,8 @@ from app.services.campaign_service import launch_campaign
 
 router = APIRouter()
 
+_background_tasks: set[asyncio.Task] = set()
+
 
 def _safe_rate(numerator: int, denominator: int) -> float:
     """Division-by-zero safe rate calculation (0–100 scale)."""
@@ -53,6 +55,7 @@ async def _get_campaign_stats(campaign: Campaign, db: AsyncSession) -> CampaignS
     FAILED_STATUSES   = ["failed"]
 
     async def _count(statuses_list):
+        """Count this campaign's messages whose status is in `statuses_list` (one funnel tier)."""
         r = await db.execute(
             select(func.count(Communication.id)).where(
                 Communication.campaign_id == campaign.id,
@@ -79,7 +82,7 @@ async def _get_campaign_stats(campaign: Campaign, db: AsyncSession) -> CampaignS
         opened=opened,
         clicked=clicked,
         converted=converted,
-        delivery_rate=_safe_rate(delivered, sent),
+        delivery_rate=_safe_rate(delivered, sent + failed),
         open_rate=_safe_rate(opened, delivered),
         click_rate=_safe_rate(clicked, opened),
         conversion_rate=_safe_rate(converted, clicked),
@@ -88,6 +91,7 @@ async def _get_campaign_stats(campaign: Campaign, db: AsyncSession) -> CampaignS
 
 @router.get("/", response_model=List[CampaignResponse])
 async def list_campaigns(db: AsyncSession = Depends(get_db)):
+    """GET /api/campaigns — every campaign, newest first (no stats; see /api/analytics/campaigns for those)."""
     result = await db.execute(select(Campaign).order_by(Campaign.created_at.desc()))
     return [CampaignResponse.model_validate(c) for c in result.scalars().all()]
 
@@ -97,6 +101,7 @@ async def create_campaign(
     body: CampaignCreate,
     db: AsyncSession = Depends(get_db),
 ):
+    """POST /api/campaigns — save a new campaign as a draft. Nothing is sent until /launch is called."""
     campaign = Campaign(
         name=body.name,
         segment_id=body.segment_id,
@@ -141,7 +146,14 @@ async def launch_campaign_endpoint(
             detail=f"Campaign is already {campaign.status} — only drafts can be launched",
         )
 
-    asyncio.create_task(_run_campaign_background(campaign_id))
+    # Claim the campaign before spawning the task so a second click can't
+    # launch it twice.
+    campaign.status = "running"
+    await db.commit()
+
+    task = asyncio.create_task(_run_campaign_background(campaign_id))
+    _background_tasks.add(task)  # keep a strong ref so it isn't GC'd mid-run
+    task.add_done_callback(_background_tasks.discard)
     return {"message": "Campaign launched", "campaign_id": str(campaign_id)}
 
 
@@ -150,6 +162,7 @@ async def get_campaign(
     campaign_id: UUID,
     db: AsyncSession = Depends(get_db),
 ):
+    """GET /api/campaigns/{id} — one campaign's fields, or 404 if it doesn't exist."""
     result = await db.execute(select(Campaign).where(Campaign.id == campaign_id))
     campaign = result.scalar_one_or_none()
     if not campaign:
@@ -162,6 +175,7 @@ async def get_campaign_stats(
     campaign_id: UUID,
     db: AsyncSession = Depends(get_db),
 ):
+    """GET /api/campaigns/{id}/stats — delivery funnel counts and rates; the detail page polls this every 4s."""
     result = await db.execute(select(Campaign).where(Campaign.id == campaign_id))
     campaign = result.scalar_one_or_none()
     if not campaign:

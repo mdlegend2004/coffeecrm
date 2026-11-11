@@ -17,6 +17,11 @@ from app.db.database import Base
 
 
 class Communication(Base):
+    """One message to one customer within a campaign.
+
+    `external_id` is shared with the channel service so delivery callbacks can find
+    this row. Status moves forward only: queued -> sent -> delivered -> opened -> clicked -> converted
+    (or failed)."""
     __tablename__ = "communications"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

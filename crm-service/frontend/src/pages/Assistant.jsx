@@ -10,6 +10,7 @@ const SUGGESTIONS = [
   'Win back lapsed shoppers who spent over ₹3000 with an SMS discount',
 ]
 
+// AI Assistant page: chat where one sentence becomes a saved segment + draft campaign, with a launch button.
 export default function Assistant() {
   const [messages, setMessages] = useState([
     { role: 'ai', text: 'Hi! Tell me who you want to reach and what you want to say — I\'ll build the segment, write the message, and set up the campaign for you.' },
@@ -23,6 +24,7 @@ export default function Assistant() {
 
   useEffect(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }), [messages, draft])
 
+  // Send the user's request to the AI, then show the drafted campaign in the preview panel.
   const submit = async (text) => {
     const intent = (text ?? input).trim()
     if (!intent || busy) return
@@ -43,6 +45,7 @@ export default function Assistant() {
     setBusy(false)
   }
 
+  // Launch the drafted campaign, then jump to its detail page to watch results arrive.
   const launch = async () => {
     if (!draft?.campaign?.id || launched) return
     setBusy(true)

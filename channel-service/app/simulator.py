@@ -16,7 +16,16 @@ import asyncio
 import random
 from datetime import datetime, timezone
 
+import os
+
 import httpx
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Shared secret the CRM checks on every callback (empty = CRM accepts any callback)
+CALLBACK_SECRET = os.getenv("CALLBACK_SECRET", "")
+AUTH_HEADERS = {"X-Callback-Secret": CALLBACK_SECRET}
 
 
 async def send_callback(
@@ -37,6 +46,7 @@ async def send_callback(
             response = await client.post(
                 f"{crm_url}/api/receipts/callback",
                 json=payload,
+                headers=AUTH_HEADERS,
                 timeout=10.0,
             )
             if response.status_code == 200:

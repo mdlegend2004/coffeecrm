@@ -11,13 +11,16 @@ const CHANNELS = [
   { id: 'rcs', label: 'RCS', icon: Radio },
 ]
 
+// Campaigns page: list of campaigns with delivery progress bars, plus the 'New campaign' wizard.
 export default function Campaigns() {
   const [campaigns, setCampaigns] = useState(null)
   const [showWizard, setShowWizard] = useState(false)
 
+  // Reload all campaigns with their funnel stats.
   const load = () => getAnalyticsCampaigns().then((d) => setCampaigns(Array.isArray(d) ? d : [])).catch(() => setCampaigns([]))
   useEffect(() => { load() }, [])
 
+  // Launch a draft campaign; show the server's reason if it refuses (e.g. already running).
   const launch = async (id) => {
     try {
       await launchCampaign(id)
@@ -47,7 +50,9 @@ export default function Campaigns() {
           {campaigns.map((c) => {
             const sent = c.sent ?? c.sent_count ?? 0
             const delivered = c.delivered ?? c.delivered_count ?? 0
-            const fillPct = sent > 0 ? (delivered / sent) * 100 : 0
+            const failed = c.failed ?? c.failed_count ?? 0
+            // failed messages drop out of "sent", so include them in the denominator
+            const fillPct = sent + failed > 0 ? (delivered / (sent + failed)) * 100 : 0
             return (
               <div key={c.campaign_id || c.id} className="card lift">
                 <div className="spread">
@@ -90,6 +95,7 @@ export default function Campaigns() {
   )
 }
 
+// 3-step modal to create a campaign: 1) pick a segment, 2) pick channel + write the message, 3) review and save or launch.
 function Wizard({ onClose }) {
   const [step, setStep] = useState(1)
   const [segments, setSegments] = useState([])
@@ -107,6 +113,7 @@ function Wizard({ onClose }) {
 
   const seg = segments.find((s) => s.id === segmentId)
 
+  // Ask the AI for 3 message variants for the chosen segment and channel.
   const writeWithAI = async () => {
     setBusy(true)
     try {
@@ -121,6 +128,7 @@ function Wizard({ onClose }) {
     setBusy(false)
   }
 
+  // Save the campaign as a draft, and launch it straight away if `launch` is true.
   const createAndLaunch = async (launch) => {
     setBusy(true)
     try {

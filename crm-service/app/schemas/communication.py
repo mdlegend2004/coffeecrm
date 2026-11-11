@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict
 
 
 class CommunicationResponse(BaseModel):
+    """A single message row as returned by the API."""
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID

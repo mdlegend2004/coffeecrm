@@ -13,6 +13,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -72,10 +73,7 @@ async def list_customers(
 
     return CustomerListResponse(
         items=[
-            CustomerResponse.model_validate(
-                {col.key: getattr(c, col.key) for col in Customer.__table__.columns}
-                | {"orders": None}
-            )
+            CustomerResponse.from_customer(c)
             for c in customers
         ],
         total=total,
@@ -89,11 +87,16 @@ async def create_customer(
     body: CustomerCreate,
     db: AsyncSession = Depends(get_db),
 ):
+    """POST /api/customers — insert one customer. Returns 409 if the email is already taken."""
     customer = Customer(**body.model_dump())
     db.add(customer)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=f"A customer with email {body.email} already exists")
     await db.refresh(customer)
-    return CustomerResponse.model_validate(customer)
+    return CustomerResponse.from_customer(customer)
 
 
 @router.post("/bulk", status_code=201)
@@ -104,7 +107,11 @@ async def bulk_create_customers(
     """Bulk insert customers. Returns count inserted."""
     customers = [Customer(**c.model_dump()) for c in body]
     db.add_all(customers)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="One or more emails already exist (or are duplicated in the batch); nothing was inserted")
     return {"inserted": len(customers)}
 
 
@@ -130,7 +137,4 @@ async def get_customer(
     )
     orders = orders_result.scalars().all()
 
-    response = CustomerResponse.model_validate(customer)
-    from app.schemas.customer import OrderSummary
-    response.orders = [OrderSummary.model_validate(o) for o in orders]
-    return response
+    return CustomerResponse.from_customer(customer, orders=orders)

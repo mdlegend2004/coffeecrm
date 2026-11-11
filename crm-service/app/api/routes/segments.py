@@ -24,6 +24,7 @@ from app.schemas.segment import (
     SegmentCreate,
     SegmentResponse,
     SegmentPreviewResponse,
+    SegmentRules,
 )
 from app.schemas.customer import CustomerResponse, CustomerListResponse
 from app.services.segmentation import RulesEngine
@@ -34,6 +35,7 @@ rules_engine = RulesEngine()
 
 @router.get("/", response_model=List[SegmentResponse])
 async def list_segments(db: AsyncSession = Depends(get_db)):
+    """GET /api/segments — every saved segment, newest first, with its cached customer_count."""
     result = await db.execute(select(Segment).order_by(Segment.created_at.desc()))
     return [SegmentResponse.model_validate(s) for s in result.scalars().all()]
 
@@ -67,11 +69,15 @@ async def create_segment(
 
 @router.post("/preview", response_model=SegmentPreviewResponse)
 async def preview_segment(
-    body: SegmentCreate,
+    body: SegmentRules,
     db: AsyncSession = Depends(get_db),
 ):
-    """Preview segment without saving to DB — safe for iterative rule building."""
-    rules_dict = body.rules.model_dump()
+    """Preview segment without saving to DB — safe for iterative rule building.
+
+    Body is just the rules ({"operator": ..., "conditions": [...]}) — a preview
+    has no name, and this is exactly what the frontend's previewSegment() sends.
+    """
+    rules_dict = body.model_dump()
     count = await rules_engine.count(db, rules_dict)
     sample = await rules_engine.sample(db, rules_dict, n=5)
 
@@ -126,6 +132,10 @@ async def delete_segment(
     segment_id: UUID,
     db: AsyncSession = Depends(get_db),
 ):
+    """DELETE /api/segments/{id} — hard-delete a segment (404 if missing).
+
+    Campaigns that used it keep existing but their segment_id becomes NULL,
+    so a draft campaign whose segment was deleted will fail when launched."""
     result = await db.execute(select(Segment).where(Segment.id == segment_id))
     segment = result.scalar_one_or_none()
     if not segment:

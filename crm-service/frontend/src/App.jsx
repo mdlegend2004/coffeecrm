@@ -7,6 +7,7 @@ import Campaigns from './pages/Campaigns'
 import CampaignDetail from './pages/CampaignDetail'
 import Assistant from './pages/Assistant'
 
+// Small coffee-cup SVG used in the sidebar logo.
 const CoffeeIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
     <path d="M5 3h11l1.5 9H5L6.5 3z" fill="rgba(3,32,29,0.9)" stroke="rgba(3,32,29,0.5)" strokeWidth="0.5" />
@@ -24,12 +25,14 @@ const nav = [
   { to: '/assistant', label: 'AI Assistant', icon: '✦' },
 ]
 
+// Scroll to the top and replay the page-enter animation whenever the URL changes.
 function PageWrapper({ children }) {
   const location = useLocation()
   useEffect(() => { window.scrollTo(0, 0) }, [location.pathname])
   return <div key={location.pathname} className="page-enter">{children}</div>
 }
 
+// App shell: sidebar navigation on the left, the current page (chosen by URL) on the right.
 export default function App() {
   return (
     <div className="app">

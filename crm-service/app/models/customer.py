@@ -14,6 +14,7 @@ from app.db.database import Base
 
 
 class Customer(Base):
+    """A shopper. total_spent / purchase_count are derived from their completed orders."""
     __tablename__ = "customers"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

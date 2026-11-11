@@ -58,6 +58,7 @@ NUM_ORDERS = 600
 
 
 async def seed():
+    """Insert 200 fake Indian customers and 600 orders, then recompute each customer's totals from completed orders."""
     print("[SEED] Starting seed...")
 
     async with AsyncSessionLocal() as db:

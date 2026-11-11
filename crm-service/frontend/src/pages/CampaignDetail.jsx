@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recha
 import { getCampaignStats, aiInsights } from '../api'
 import { StatusBadge, ChannelBadge, Loader, pct } from '../components/ui'
 
+// Campaign detail page: rate tiles, funnel chart (refreshes every 4s), and on-demand AI insights.
 export default function CampaignDetail() {
   const { id } = useParams()
   const [stats, setStats] = useState(null)
@@ -12,6 +13,7 @@ export default function CampaignDetail() {
   const [insightsBusy, setInsightsBusy] = useState(false)
   const timer = useRef(null)
 
+  // Fetch the latest funnel stats for this campaign.
   const load = () => getCampaignStats(id).then(setStats).catch(() => {})
 
   useEffect(() => {
@@ -21,6 +23,7 @@ export default function CampaignDetail() {
     return () => clearInterval(timer.current)
   }, [id])
 
+  // Ask the AI to analyse this campaign's performance.
   const fetchInsights = async () => {
     setInsightsBusy(true)
     try {

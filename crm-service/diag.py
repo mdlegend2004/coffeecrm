@@ -5,6 +5,7 @@ from sqlalchemy import text
 
 
 async def check():
+    """Print raw-SQL status breakdowns of communications and campaigns (debugging helper)."""
     async with AsyncSessionLocal() as db:
         # 1. Overall communication status distribution
         r = await db.execute(text("SELECT status, count(*) FROM communications GROUP BY status ORDER BY count(*) DESC"))

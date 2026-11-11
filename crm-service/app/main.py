@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import customers, campaigns, segments, receipts, analytics, ai
+from app.security import access_guard
 
 app = FastAPI(
     title="BrewCo CRM API",
@@ -36,6 +37,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Password protection — active only when APP_PASSWORD / CALLBACK_SECRET are set
+# (see app/security.py). Local dev without them is unaffected.
+app.middleware("http")(access_guard)
+
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(customers.router, prefix="/api/customers", tags=["customers"])
 app.include_router(segments.router,  prefix="/api/segments",  tags=["segments"])
@@ -47,6 +52,7 @@ app.include_router(ai.router,        prefix="/api/ai",         tags=["ai"])
 
 @app.get("/health", tags=["system"])
 async def health():
+    """Liveness check: returns 200 so you (or Render) can tell the CRM API is up."""
     return {"status": "ok", "service": "crm"}
 
 

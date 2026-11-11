@@ -11,6 +11,7 @@ from app.models.communication import Communication
 
 
 async def check():
+    """Print message status counts for the most recent campaigns (debugging helper)."""
     async with AsyncSessionLocal() as db:
         # Raw count from DB
         raw = await db.execute(text("SELECT status, count(*) FROM communications GROUP BY status"))

@@ -26,6 +26,7 @@ from app.models.customer import Customer
 
 
 class RulesEngine:
+    """Turns a segment's JSON rules into SQL WHERE clauses and runs count / id / sample queries."""
     # Map rule field names → Customer model attributes
     FIELD_MAP = {
         "total_spent": Customer.total_spent,
@@ -175,6 +176,7 @@ if __name__ == "__main__":
     from app.db.database import AsyncSessionLocal
 
     async def _test():
+        """Manual smoke test: print how many big spenders live in Mumbai or Delhi."""
         rules = {
             "operator": "AND",
             "conditions": [

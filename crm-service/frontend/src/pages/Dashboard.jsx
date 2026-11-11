@@ -5,11 +5,13 @@ import { getOverview, getAnalyticsCampaigns } from '../api'
 import { StatusBadge, ChannelBadge, Loader, pct } from '../components/ui'
 import { useCountUp } from '../components/useCountUp'
 
+// Shows a number that counts up from 0 when the dashboard opens.
 function AnimatedCount({ value, decimals = 0, suffix = '' }) {
   const animated = useCountUp(value)
   return <>{animated.toFixed(decimals)}{suffix}</>
 }
 
+// One KPI tile: label with icon, big value, and a small caption.
 function StatCard({ label, display, sub, icon, delay = 0 }) {
   return (
     <div className="card lift card-enter" style={{ animationDelay: `${delay}ms` }}>
@@ -20,6 +22,7 @@ function StatCard({ label, display, sub, icon, delay = 0 }) {
   )
 }
 
+// Home page: KPI tiles, the 6 most recent campaigns, and a sent/delivered/opened chart.
 export default function Dashboard() {
   const [overview, setOverview] = useState(null)
   const [campaigns, setCampaigns] = useState(null)

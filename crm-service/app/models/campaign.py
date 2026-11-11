@@ -15,6 +15,7 @@ from app.db.database import Base
 
 
 class Campaign(Base):
+    """A message blast to one segment over one channel. Status: draft -> running -> completed (or failed)."""
     __tablename__ = "campaigns"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

@@ -62,6 +62,7 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
+    """Bind Alembic to an open (sync-wrapped) connection and apply all pending migrations in one transaction."""
     context.configure(connection=connection, target_metadata=target_metadata)
     with context.begin_transaction():
         context.run_migrations()

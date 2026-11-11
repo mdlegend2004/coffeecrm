@@ -65,8 +65,16 @@ async def analytics_overview(db: AsyncSession = Depends(get_db)):
         )
         delivered = delivered_r.scalar_one()
 
-        if sent > 0:
-            delivery_rates.append(delivered / sent * 100)
+        failed_r = await db.execute(
+            select(func.count(Communication.id)).where(
+                Communication.campaign_id == campaign.id,
+                Communication.status == "failed",
+            )
+        )
+        attempted = sent + failed_r.scalar_one()
+
+        if attempted > 0:
+            delivery_rates.append(delivered / attempted * 100)
 
     avg_delivery_rate = round(sum(delivery_rates) / len(delivery_rates), 2) if delivery_rates else 0.0
 
@@ -104,9 +112,11 @@ async def analytics_campaigns(db: AsyncSession = Depends(get_db)):
     FAILED_STATUSES    = ["failed"]
 
     def safe_rate(n, d):
+        """Return n/d as a 0-100 percentage rounded to 2 places, or 0.0 when d is 0."""
         return round(n / d * 100, 2) if d > 0 else 0.0
 
     async def _count(campaign_id, statuses_list):
+        """Count one campaign's messages whose status is in `statuses_list` (one funnel tier)."""
         r = await db.execute(
             select(func.count(Communication.id)).where(
                 Communication.campaign_id == campaign_id,
@@ -136,7 +146,7 @@ async def analytics_campaigns(db: AsyncSession = Depends(get_db)):
             "opened": opened,
             "clicked": clicked,
             "converted": converted,
-            "delivery_rate": safe_rate(delivered, sent),
+            "delivery_rate": safe_rate(delivered, sent + failed),
             "open_rate": safe_rate(opened, delivered),
             "click_rate": safe_rate(clicked, opened),
             "conversion_rate": safe_rate(converted, clicked),

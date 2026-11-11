@@ -14,6 +14,7 @@ from app.db.database import Base
 
 
 class Order(Base):
+    """One purchase by a customer (status: completed, pending or returned)."""
     __tablename__ = "orders"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

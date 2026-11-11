@@ -5,6 +5,7 @@ import { inr, timeAgo, TagBadge, StatusBadge, Loader } from '../components/ui'
 
 const CITIES = ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 'Pune', 'Kolkata']
 
+// Customers page: searchable, filterable, paginated table; click a row for details.
 export default function Customers() {
   const [data, setData] = useState(null)
   const [page, setPage] = useState(1)
@@ -13,6 +14,7 @@ export default function Customers() {
   const [minSpent, setMinSpent] = useState('')
   const [selected, setSelected] = useState(null)
 
+  // Fetch the current page of customers using the active search / city / spend filters.
   const load = () => {
     const params = { page, limit: 20 }
     if (search) params.search = search
@@ -23,6 +25,7 @@ export default function Customers() {
 
   useEffect(() => { load() }, [page, city, minSpent])
 
+  // Open the detail modal immediately, then fill in the customer's recent orders from the API.
   const openDetail = async (c) => {
     setSelected({ ...c, loading: true })
     try {

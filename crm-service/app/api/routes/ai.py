@@ -109,6 +109,7 @@ async def campaign_insights(
     FAILED_STATUSES    = ["failed"]
 
     async def _count(statuses_list):
+        """Count this campaign's messages whose status is in `statuses_list` (one funnel tier)."""
         r = await db.execute(
             select(func.count(Communication.id)).where(
                 Communication.campaign_id == campaign_id,
@@ -125,6 +126,7 @@ async def campaign_insights(
     converted = await _count(CONVERTED_STATUSES)
 
     def safe_rate(n, d):
+        """Return n/d as a 0-100 percentage rounded to 2 places, or 0.0 when d is 0."""
         return round(n / d * 100, 2) if d > 0 else 0.0
 
     stats = {
@@ -134,7 +136,7 @@ async def campaign_insights(
         "opened": opened,
         "clicked": clicked,
         "converted": converted,
-        "delivery_rate": safe_rate(delivered, sent),
+        "delivery_rate": safe_rate(delivered, sent + failed),
         "open_rate": safe_rate(opened, delivered),
         "click_rate": safe_rate(clicked, opened),
         "conversion_rate": safe_rate(converted, clicked),

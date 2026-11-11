@@ -17,17 +17,20 @@ from app.schemas.customer import CustomerResponse
 
 
 class SegmentCondition(BaseModel):
+    """One rule, e.g. {field: 'city', op: 'eq', value: 'Mumbai'}."""
     field: str
     op: str
     value: Any
 
 
 class SegmentRules(BaseModel):
+    """A list of conditions joined by AND or OR. This is the body of POST /api/segments/preview."""
     operator: Literal["AND", "OR"]
     conditions: List[SegmentCondition]
 
 
 class SegmentCreate(BaseModel):
+    """Body for POST /api/segments: a name, optional description, and the rules."""
     name: str
     description: Optional[str] = None
     rules: SegmentRules
@@ -35,6 +38,7 @@ class SegmentCreate(BaseModel):
 
 
 class SegmentResponse(BaseModel):
+    """A saved segment as returned by the API, including its cached customer_count."""
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
@@ -47,5 +51,6 @@ class SegmentResponse(BaseModel):
 
 
 class SegmentPreviewResponse(BaseModel):
+    """How many customers match some rules, plus up to 5 examples."""
     count: int
     sample_customers: List[CustomerResponse]

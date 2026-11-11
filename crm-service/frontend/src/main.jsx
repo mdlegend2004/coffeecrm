@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './index.css'
 
+// Track the mouse over each .card so CSS can draw a spotlight glow at the cursor (--mx / --my).
 document.addEventListener('mousemove', (e) => {
   document.querySelectorAll('.card').forEach((card) => {
     const rect = card.getBoundingClientRect()
@@ -12,11 +13,13 @@ document.addEventListener('mousemove', (e) => {
   })
 })
 
+// Draw slowly drifting coffee beans on a full-screen background canvas.
 function initParticles() {
   const canvas = document.createElement('canvas')
   canvas.id = 'particle-canvas'
   document.body.prepend(canvas)
   const ctx = canvas.getContext('2d')
+  // Keep the canvas the same size as the window.
   const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight }
   resize()
   window.addEventListener('resize', resize)
@@ -43,6 +46,7 @@ function initParticles() {
     color: BEAN_COLORS[Math.floor(Math.random() * BEAN_COLORS.length)],
   }))
 
+  // Draw one coffee bean (an ellipse with a curved crease) at the given position, angle and opacity.
   function drawBean(ctx, x, y, size, rotation, opacity, color) {
     ctx.save()
     ctx.translate(x, y)
@@ -66,6 +70,7 @@ function initParticles() {
   }
 
   let raf
+  // Move every bean one step, wrap it around the screen edges, redraw, and schedule the next frame.
   function animate() {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     particles.forEach((p) => {
@@ -88,6 +93,7 @@ function initParticles() {
 
 initParticles()
 
+// Mount the React app, wrapped in the router so pages can use URLs.
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>

@@ -4,6 +4,7 @@ from sqlalchemy import select, func
 from app.models.customer import Customer
 
 async def check():
+    """Print customer counts per city, spend ranges, and case-sensitivity checks (debugging helper)."""
     async with AsyncSessionLocal() as db:
         r = await db.execute(select(func.count()).select_from(Customer))
         print(f"Total customers: {r.scalar_one()}")

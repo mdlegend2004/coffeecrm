@@ -13,6 +13,8 @@ import asyncio
 
 import httpx
 
+from app.simulator import AUTH_HEADERS
+
 
 async def retry_pending_callbacks(pending_callbacks: list, crm_url: str) -> None:
     """
@@ -37,6 +39,7 @@ async def retry_pending_callbacks(pending_callbacks: list, crm_url: str) -> None
                     response = await client.post(
                         f"{crm_url}/api/receipts/callback",
                         json=payload,
+                        headers=AUTH_HEADERS,
                         timeout=10.0,
                     )
                     if response.status_code != 200:

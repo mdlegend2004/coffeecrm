@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict
 
 
 class OrderResponse(BaseModel):
+    """A single order as returned by the API."""
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID

@@ -23,6 +23,9 @@ from app.schemas.communication import ReceiptCallback
 
 router = APIRouter()
 
+_RANK = {"queued": 0, "sent": 1, "failed": 1, "delivered": 2, "opened": 3,
+         "read": 4, "clicked": 5, "converted": 6}
+
 
 @router.post("/callback")
 async def receipt_callback(
@@ -46,6 +49,13 @@ async def receipt_callback(
     status = body.status.lower()
     # Strip timezone info — DB columns are TIMESTAMP WITHOUT TIME ZONE
     ts = body.timestamp.replace(tzinfo=None)
+
+    # Never move a message backwards in the funnel (retried / out-of-order
+    # callbacks would otherwise downgrade e.g. "clicked" back to "delivered").
+    if _RANK.get(status, 0) <= _RANK.get(comm.status, 0) and status != "failed":
+        return {"received": True}
+    if status == "failed" and _RANK.get(comm.status, 0) >= _RANK["delivered"]:
+        return {"received": True}
 
     if status == "delivered":
         comm.status = "delivered"

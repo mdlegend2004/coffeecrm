@@ -15,11 +15,12 @@ Design:
 
 import asyncio
 import os
+import secrets
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException
 
-from app.simulator import simulate_delivery
+from app.simulator import simulate_delivery, CALLBACK_SECRET
 from app.callback_worker import retry_pending_callbacks
 
 load_dotenv()
@@ -42,11 +43,14 @@ async def startup_event():
 
 
 @app.post("/send")
-async def send_messages(payload: list[dict]):
+async def send_messages(payload: list[dict], x_callback_secret: str = Header(default="")):
     """
     Accept a batch of messages and simulate delivery asynchronously.
     Returns immediately with accepted count.
+    When CALLBACK_SECRET is set, only callers presenting it (the CRM) are accepted.
     """
+    if CALLBACK_SECRET and not secrets.compare_digest(x_callback_secret.encode(), CALLBACK_SECRET.encode()):
+        raise HTTPException(status_code=403, detail="Invalid secret")
     for item in payload:
         asyncio.create_task(
             simulate_delivery(item, CRM_CALLBACK_URL, pending_callbacks)
@@ -56,6 +60,7 @@ async def send_messages(payload: list[dict]):
 
 @app.get("/health", tags=["system"])
 async def health():
+    """Liveness check: returns 200 so you (or Render) can tell the channel service is up."""
     return {"status": "ok", "service": "channel"}
 
 

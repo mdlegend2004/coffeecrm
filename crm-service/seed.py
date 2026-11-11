@@ -65,11 +65,13 @@ GENDERS = ["male", "female"]
 
 
 def random_date(start_days_ago: int, end_days_ago: int) -> datetime:
+    """Return a random datetime between `start_days_ago` and `end_days_ago` days before now."""
     days = random.randint(end_days_ago, start_days_ago)
     return datetime.utcnow() - timedelta(days=days)
 
 
 async def seed():
+    """Create tables if needed and fill the DB with sample customers and orders; used by build.sh on deploy."""
     # Create tables if they don't exist
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
