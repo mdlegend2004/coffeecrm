@@ -76,20 +76,21 @@ This project includes a `render.yaml` Blueprint for **one-click deployment**.
 1. Push this repo to GitHub
 2. Go to [Render Dashboard](https://dashboard.render.com/) → **New** → **Blueprint**
 3. Connect your GitHub repo and select the `main` branch
-4. Render auto-detects `render.yaml` and creates (all in the Singapore region):
-   - **brewco-crm-app** — CRM backend + React frontend (Python web service)
-   - **brewco-channel-app** — Channel simulation service (Python web service)
+4. Render auto-detects `render.yaml` and creates (both in the Singapore region):
+   - **brewco-crm-app** — CRM backend + React frontend, with the delivery simulator built in
    - **brewco-postgres** — PostgreSQL database (free tier)
+
+   No separate channel service is needed on Render: when `CHANNEL_SERVICE_URL` is unset, the CRM simulates delivery itself (see [flow.md §7](flow.md#7-deployment-render)).
 5. When asked, enter `OPENAI_API_KEY` and `APP_PASSWORD` (the password the site will ask for)
 6. Deploy! The build script handles: pip install → npm build → migrations → seed
 7. Open the `brewco-crm-app` URL and sign in with username `admin` and your `APP_PASSWORD`
 
 ### Option B — Manual Setup
 1. Create a PostgreSQL database on Render
-2. Create two Web Services pointing to `crm-service/` and `channel-service/`
-3. Set environment variables (see below)
-4. Build command: `chmod +x build.sh && ./build.sh`
-5. Start command: `gunicorn app.main:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT`
+2. Create **one** Web Service in the **same region**, with Root Directory `crm-service`
+3. Build command: `chmod +x build.sh && ./build.sh`
+4. Start command: `gunicorn app.main:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT`
+5. Environment: `DATABASE_URL` (the database's **Internal Database URL**), `OPENAI_API_KEY`, `APP_PASSWORD`, `PYTHON_VERSION=3.11.9`, `NODE_VERSION=20.11.1`. Do **not** set `CHANNEL_SERVICE_URL`, and don't copy values from your local `.env`.
 
 ---
 
@@ -101,7 +102,7 @@ This project includes a `render.yaml` Blueprint for **one-click deployment**.
 |---|---|---|
 | `DATABASE_URL` | PostgreSQL async connection string | `postgresql+asyncpg://postgres:password@localhost:5432/brewco` |
 | `OPENAI_API_KEY` | OpenAI API key for gpt-4o-mini calls | *(required)* |
-| `CHANNEL_SERVICE_URL` | Base URL of the channel service | `http://localhost:8001` |
+| `CHANNEL_SERVICE_URL` | Base URL of the channel service. **Empty = built-in simulator** (single-service mode) | *(empty)* |
 | `APP_PASSWORD` | Password-protects the whole site (browser login box). Empty = no password | *(empty)* |
 | `APP_USERNAME` | Username for the login box | `admin` |
 | `CALLBACK_SECRET` | Shared secret with the channel service. Empty = not checked | *(empty)* |

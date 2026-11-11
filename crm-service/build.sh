@@ -9,6 +9,21 @@
 
 set -o errexit  # exit on error
 
+# On Render (RENDER=true), catch the two most common setup mistakes early.
+if [ "${RENDER:-}" = "true" ]; then
+  case "${DATABASE_URL:-}" in
+    "")
+      echo "ERROR: DATABASE_URL is not set."
+      echo "  Render dashboard -> your PostgreSQL database -> copy the 'Internal Database URL'"
+      echo "  -> this service -> Environment -> add DATABASE_URL = <that URL> -> Save."
+      exit 1 ;;
+    *localhost*|*127.0.0.1*)
+      echo "ERROR: DATABASE_URL points at localhost (that's your own PC's database, not Render's)."
+      echo "  Replace it with your Render database's 'Internal Database URL'."
+      exit 1 ;;
+  esac
+fi
+
 echo "==> Installing Python dependencies..."
 pip install --upgrade pip
 pip install -r requirements.txt

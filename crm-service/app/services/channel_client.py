@@ -32,7 +32,9 @@ def _normalise_url(url: str) -> str:
     return url
 
 
-CHANNEL_SERVICE_URL = _normalise_url(os.getenv("CHANNEL_SERVICE_URL", "http://localhost:8001"))
+# Empty / unset → use the built-in simulator (services/embedded_channel.py):
+# one-service deploys need no second service, URLs or secrets.
+CHANNEL_SERVICE_URL = _normalise_url(os.getenv("CHANNEL_SERVICE_URL", ""))
 # Shared secret proving to the channel service that this request came from the CRM
 CALLBACK_SECRET = os.getenv("CALLBACK_SECRET", "")
 
@@ -50,6 +52,10 @@ async def send_batch(communications: List[dict]) -> Dict[str, str]:
     Returns:
       { external_id: "accepted" | "failed" }
     """
+    if not CHANNEL_SERVICE_URL:
+        from app.services import embedded_channel
+        return embedded_channel.send_batch(communications)
+
     result: Dict[str, str] = {}
 
     # Initialise all as failed — overwrite on success

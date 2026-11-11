@@ -34,6 +34,8 @@ flowchart LR
 
 The frontend never talks to the channel service, the database, or OpenAI directly. Everything goes through the CRM API.
 
+> **On Render it's simpler:** only the CRM and the database are deployed. The CRM runs a built-in copy of the channel simulator instead of calling a separate service. See [section 7](#7-deployment-render).
+
 ---
 
 ## 2. Running it locally
@@ -307,7 +309,7 @@ All four live in [`services/ai_service.py`](crm-service/app/services/ai_service.
 |---|---|---|---|
 | `crm-service/.env` | `DATABASE_URL` | `db/database.py`, Alembic | `postgresql+asyncpg://postgres:password@localhost:5432/brewco` (`postgres://` URLs from Render are converted automatically) |
 | | `OPENAI_API_KEY` | `services/ai_service.py` | *(required for AI features)* |
-| | `CHANNEL_SERVICE_URL` | `services/channel_client.py` | `http://localhost:8001` |
+| | `CHANNEL_SERVICE_URL` | `services/channel_client.py` | empty → **built-in simulator** (single-service mode, used on Render). Set to `http://localhost:8001` to use the separate channel service. |
 | | `APP_PASSWORD` | `app/security.py` | empty → **no password** (local dev). Set it to password-protect the whole site. |
 | | `APP_USERNAME` | `app/security.py` | `admin` |
 | | `CALLBACK_SECRET` | `app/security.py`, `services/channel_client.py` | empty → not checked. Must match the channel service's value. |
@@ -319,13 +321,32 @@ All four live in [`services/ai_service.py`](crm-service/app/services/ai_service.
 
 ## 7. Deployment (Render)
 
-[`render.yaml`](render.yaml) creates three resources, all in the **Singapore** region. They must share a region, because the database's internal address only works within one region:
+On Render the app runs as **one web service plus one database**. The channel service isn't deployed: with `CHANNEL_SERVICE_URL` unset, the CRM uses its **built-in simulator** ([`services/embedded_channel.py`](crm-service/app/services/embedded_channel.py)). That simulator has the same odds and delays as `channel-service`, but runs inside the CRM and writes delivery results straight to the database. So there are no service URLs or secrets to configure.
+
+| Mode | When | How delivery results get back |
+|---|---|---|
+| **Two services** (local dev) | `CHANNEL_SERVICE_URL=http://localhost:8001` | CRM → `POST /send` → channel service → `POST /api/receipts/callback` |
+| **One service** (Render) | `CHANNEL_SERVICE_URL` empty | CRM starts a simulation task per message → `receipt_service.apply_receipt()` directly |
+
+Both modes update messages through the same function, `services/receipt_service.py::apply_receipt()`, so the funnel rules (forward-only status, 15% conversion) are identical.
+
+[`render.yaml`](render.yaml) creates, both in the **Singapore** region (they must share a region, because the database's internal address only works within one region):
 
 - **brewco-postgres**: PostgreSQL (free plan, which Render expires after a while; see below).
 - **brewco-crm-app**: runs [`crm-service/build.sh`](crm-service/build.sh) (pip install → `npm run build` → `alembic upgrade head` → `python seed.py`), then gunicorn with 2 workers. In production there's no Vite server: `app/main.py` serves `frontend/dist/` itself, so the frontend and API share one URL.
-- **brewco-channel-app**: runs gunicorn with **1 worker**. It has to stay at 1, because `pending_callbacks` lives in memory and isn't shared between workers.
 
-The two services find each other through `RENDER_EXTERNAL_URL`. `OPENAI_API_KEY` and `APP_PASSWORD` must be set by hand in the dashboard.
+When you create the Blueprint, Render asks for `OPENAI_API_KEY` and `APP_PASSWORD`. `DATABASE_URL` is filled in from the database automatically.
+
+**Setting it up by hand instead of with the Blueprint:**
+
+| Setting | Value |
+|---|---|
+| Root Directory | `crm-service` |
+| Build Command | `chmod +x build.sh && ./build.sh` |
+| Start Command | `gunicorn app.main:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT` |
+| Environment | `DATABASE_URL` (the database's *Internal Database URL*), `OPENAI_API_KEY`, `APP_PASSWORD`, `PYTHON_VERSION=3.11.9`, `NODE_VERSION=20.11.1` |
+
+`build.sh` stops early with a clear message if, on Render, `DATABASE_URL` is missing or points at `localhost`.
 
 ### Password protection
 
@@ -344,9 +365,7 @@ flowchart TD
 ```
 
 - **You:** open the site, type `admin` and your `APP_PASSWORD` once, and the browser remembers it for the session. The frontend's API calls go to the same address, so they reuse it automatically.
-- **CRM → channel service:** `channel_client.send_batch()` sends `X-Callback-Secret`, and the channel service's `/send` rejects requests without it (403).
-- **Channel service → CRM:** every delivery update carries the same header, so nobody else can post fake results.
-- `CALLBACK_SECRET` is generated randomly by Render on the CRM and copied to the channel service through `fromService` in `render.yaml`, so you never have to type it.
+- **Two-service mode only:** `CALLBACK_SECRET` protects the traffic between the services. `channel_client.send_batch()` sends it as `X-Callback-Secret` and the channel service's `/send` rejects requests without it (403). Every delivery update sent back carries it too, so nobody else can post fake results. In single-service mode (Render) there's no traffic between services, so it isn't needed. If it's unset, the receipts webhook isn't checked, but it can only update messages whose random `external_id` is known.
 - If `APP_PASSWORD` / `CALLBACK_SECRET` are empty (local dev), every check is skipped.
 
 ---
@@ -362,6 +381,7 @@ flowchart TD
 - **Password protection is one shared password**, not user accounts. Anyone who knows it has full access, so pick a long one and change it in Render if it leaks. Use the site over `https://` (Render's default), never plain `http://`, so the password isn't sent in the clear.
 - **Delivery is simulated.** Delivery, open and click outcomes are random, and the 15% conversion is decided by the CRM, not by real customer behaviour.
 - **Small timing overlap during launch:** each batch is marked `sent` right after the channel service accepts it. Delivery callbacks arrive at least 1 s later, so in practice they come after it. With a very slow database, a `delivered` update could be overwritten by `sent`.
-- **If delivery results never arrive on Render** (campaigns show 0 delivered), the two services can't reach each other. In Render, set `CHANNEL_SERVICE_URL` on brewco-crm-app to the channel service's `https://...onrender.com` address, and `CRM_CALLBACK_URL` on brewco-channel-app to the CRM's address. Also check both have the same `CALLBACK_SECRET`.
+- **If delivery results never arrive on Render** (campaigns show 0 delivered), check that `CHANNEL_SERVICE_URL` is **not set** on the service. If it's set (e.g. copied from your local `.env`), the CRM tries to reach a channel service that isn't there.
+- **Simulated deliveries run inside the CRM process on Render.** A restart mid-campaign stops the remaining delivery results for that campaign.
 - **Build fails with `Name or service not known` during migrations:** `DATABASE_URL` points at a database Render can't find. The free database may have expired, or it's in a different region. Copy the database's *Internal Database URL* into `DATABASE_URL`.
 - **Campaign launches run inside the API process.** If the CRM API restarts mid-launch, the remaining batches are not sent and the campaign stays `running`.

@@ -1,13 +1,14 @@
 # render.yaml — Render Blueprint (Infrastructure-as-Code)
 #
-# Deploy all 3 resources at once:
+# Deploys ONE web service + ONE database:
 #   Render Dashboard → New → Blueprint → connect this repo
 #
-# When the Blueprint is created, Render asks for the values marked `sync: false`
-# (OPENAI_API_KEY and APP_PASSWORD). Everything else is filled in automatically.
+# The CRM runs its built-in delivery simulator (CHANNEL_SERVICE_URL is not set),
+# so the separate channel-service is not needed on Render.
 #
-# All three resources are in the same region: the database's internal address
-# only works for services in the same region as the database.
+# When the Blueprint is created, Render asks for the values marked `sync: false`
+# (OPENAI_API_KEY and APP_PASSWORD). DATABASE_URL is filled in automatically.
+# The database and the service must be in the same region.
 
 databases:
   - name: brewco-postgres
@@ -17,7 +18,6 @@ databases:
     user: brewco
 
 services:
-  # ── CRM Backend + Frontend ─────────────────────────────────────────────────
   - type: web
     name: brewco-crm-app
     runtime: python
@@ -38,39 +38,7 @@ services:
         sync: false       # the password your browser will ask for
       - key: APP_USERNAME
         value: admin
-      - key: CALLBACK_SECRET
-        generateValue: true   # random secret, copied to brewco-channel-app below
-      - key: CHANNEL_SERVICE_URL
-        fromService:
-          type: web
-          name: brewco-channel-app
-          envVarKey: RENDER_EXTERNAL_URL
       - key: PYTHON_VERSION
         value: "3.11.9"
       - key: NODE_VERSION
         value: "20.11.1"
-
-  # ── Channel Service (simulated SMS / WhatsApp / email provider) ────────────
-  - type: web
-    name: brewco-channel-app
-    runtime: python
-    plan: free
-    region: singapore
-    rootDir: channel-service
-    healthCheckPath: /health
-    buildCommand: chmod +x build.sh && ./build.sh
-    # Must stay at 1 worker: the retry queue for callbacks lives in memory.
-    startCommand: gunicorn app.main:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT
-    envVars:
-      - key: CRM_CALLBACK_URL
-        fromService:
-          type: web
-          name: brewco-crm-app
-          envVarKey: RENDER_EXTERNAL_URL
-      - key: CALLBACK_SECRET
-        fromService:
-          type: web
-          name: brewco-crm-app
-          envVarKey: CALLBACK_SECRET
-      - key: PYTHON_VERSION
-        value: "3.11.9"
