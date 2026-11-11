@@ -25,7 +25,15 @@ from app.callback_worker import retry_pending_callbacks
 
 load_dotenv()
 
-CRM_CALLBACK_URL = os.getenv("CRM_CALLBACK_URL", "http://localhost:8000")
+def _normalise_url(url: str) -> str:
+    """Accept 'host', 'host/' or 'https://host/' and return 'https://host' (http kept for localhost)."""
+    url = url.strip().rstrip("/")
+    if url and "://" not in url:
+        url = ("http://" if url.startswith(("localhost", "127.0.0.1")) else "https://") + url
+    return url
+
+
+CRM_CALLBACK_URL = _normalise_url(os.getenv("CRM_CALLBACK_URL", "http://localhost:8000"))
 
 app = FastAPI(title="BrewCo Channel Service", version="1.0.0")
 

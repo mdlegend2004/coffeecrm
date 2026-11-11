@@ -2,6 +2,8 @@
 
 > An AI-powered CRM for BrewCo coffee chain to segment shoppers, craft personalised messages, run campaigns, and track delivery performance.
 
+📖 **How it all fits together** (architecture, data flow, every feature step by step): see [flow.md](flow.md).
+
 ---
 
 ## Architecture
@@ -49,7 +51,7 @@ cd crm-service
 pip install -r requirements.txt
 cp .env.example .env       # fill in your DATABASE_URL and OPENAI_API_KEY
 alembic upgrade head       # run migrations
-python -m app.db.seed      # seed 200 customers + 600 orders
+python seed.py             # seed sample customers + orders (skips if already seeded)
 uvicorn app.main:app --port 8000 --reload
 ```
 
@@ -74,12 +76,13 @@ This project includes a `render.yaml` Blueprint for **one-click deployment**.
 1. Push this repo to GitHub
 2. Go to [Render Dashboard](https://dashboard.render.com/) → **New** → **Blueprint**
 3. Connect your GitHub repo and select the `main` branch
-4. Render auto-detects `render.yaml` and creates:
-   - **brewco-crm** — CRM backend + React frontend (Python web service)
-   - **brewco-channel** — Channel simulation service (Python web service)
-   - **brewco-db** — PostgreSQL database (free tier)
-5. Set `OPENAI_API_KEY` manually in the brewco-crm service environment
+4. Render auto-detects `render.yaml` and creates (all in the Singapore region):
+   - **brewco-crm-app** — CRM backend + React frontend (Python web service)
+   - **brewco-channel-app** — Channel simulation service (Python web service)
+   - **brewco-postgres** — PostgreSQL database (free tier)
+5. When asked, enter `OPENAI_API_KEY` and `APP_PASSWORD` (the password the site will ask for)
 6. Deploy! The build script handles: pip install → npm build → migrations → seed
+7. Open the `brewco-crm-app` URL and sign in with username `admin` and your `APP_PASSWORD`
 
 ### Option B — Manual Setup
 1. Create a PostgreSQL database on Render
@@ -99,13 +102,16 @@ This project includes a `render.yaml` Blueprint for **one-click deployment**.
 | `DATABASE_URL` | PostgreSQL async connection string | `postgresql+asyncpg://postgres:password@localhost:5432/brewco` |
 | `OPENAI_API_KEY` | OpenAI API key for gpt-4o-mini calls | *(required)* |
 | `CHANNEL_SERVICE_URL` | Base URL of the channel service | `http://localhost:8001` |
-| `CRM_SERVICE_URL` | Base URL of this CRM service | `http://localhost:8000` |
+| `APP_PASSWORD` | Password-protects the whole site (browser login box). Empty = no password | *(empty)* |
+| `APP_USERNAME` | Username for the login box | `admin` |
+| `CALLBACK_SECRET` | Shared secret with the channel service. Empty = not checked | *(empty)* |
 
 ### channel-service/.env
 
 | Variable | Description | Default |
 |---|---|---|
 | `CRM_CALLBACK_URL` | CRM service URL for receipt callbacks | `http://localhost:8000` |
+| `CALLBACK_SECRET` | Must match the CRM's `CALLBACK_SECRET` | *(empty)* |
 
 ---
 
@@ -181,8 +187,8 @@ Campaign launches involve N HTTP calls to the channel service (N = customer coun
 ### BackgroundTasks for campaign launch
 `POST /api/campaigns/{id}/launch` returns a 200 instantly. The actual send loop runs in a `BackgroundTask` with its **own** database session (not the request session, which closes when the response is sent). This is the canonical pattern for long-running work in async FastAPI.
 
-### No auth
-Out of scope for this assignment. In production: JWT (via `python-jose`) with role-based access (marketing manager vs. read-only analyst).
+### Password protection instead of user accounts
+A single shared password (HTTP Basic auth, `APP_PASSWORD`) keeps a deployed instance private without building a login system; the two services authenticate to each other with `CALLBACK_SECRET`. Both are off when unset, so local dev needs no setup. See `app/security.py` and the "Password protection" section of [flow.md](flow.md). For real multi-user use: JWT (via `python-jose`) with role-based access (marketing manager vs. read-only analyst).
 
 ### No Redis / Celery
 The in-memory `pending_callbacks` list in the channel service is sufficient at demo scale. The 30-second retry worker covers transient failures.
@@ -212,6 +218,7 @@ xeno-mini-crm/
 ├── crm-service/
 │   ├── app/
 │   │   ├── main.py                    # FastAPI app + router mounts
+│   │   ├── security.py                # optional site password + service secret
 │   │   ├── api/routes/
 │   │   │   ├── customers.py           # CRUD + bulk + detail
 │   │   │   ├── campaigns.py           # Draft/launch/stats
@@ -240,5 +247,7 @@ xeno-mini-crm/
 │   │   └── callback_worker.py         # 30s retry loop
 │   ├── requirements.txt
 │   └── .env.example
+├── render.yaml                        # Render Blueprint (2 services + Postgres)
+├── flow.md                            # how everything works, with diagrams
 └── README.md
 ```

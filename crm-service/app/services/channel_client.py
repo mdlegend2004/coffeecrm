@@ -24,7 +24,15 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-CHANNEL_SERVICE_URL = os.getenv("CHANNEL_SERVICE_URL", "http://localhost:8001")
+def _normalise_url(url: str) -> str:
+    """Accept 'host', 'host/' or 'https://host/' and return 'https://host' (http kept for localhost)."""
+    url = url.strip().rstrip("/")
+    if url and "://" not in url:
+        url = ("http://" if url.startswith(("localhost", "127.0.0.1")) else "https://") + url
+    return url
+
+
+CHANNEL_SERVICE_URL = _normalise_url(os.getenv("CHANNEL_SERVICE_URL", "http://localhost:8001"))
 # Shared secret proving to the channel service that this request came from the CRM
 CALLBACK_SECRET = os.getenv("CALLBACK_SECRET", "")
 

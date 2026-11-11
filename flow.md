@@ -319,11 +319,11 @@ All four live in [`services/ai_service.py`](crm-service/app/services/ai_service.
 
 ## 7. Deployment (Render)
 
-[`render.yaml`](render.yaml) creates three resources:
+[`render.yaml`](render.yaml) creates three resources, all in the **Singapore** region. They must share a region, because the database's internal address only works within one region:
 
-- **brewco-db**: PostgreSQL.
-- **brewco-crm**: runs [`crm-service/build.sh`](crm-service/build.sh) (pip install → `npm run build` → `alembic upgrade head` → `python seed.py`), then gunicorn with 2 workers. In production there's no Vite server: `app/main.py` serves `frontend/dist/` itself, so the frontend and API share one URL.
-- **brewco-channel**: runs gunicorn with **1 worker**. It has to stay at 1, because `pending_callbacks` lives in memory and isn't shared between workers.
+- **brewco-postgres**: PostgreSQL (free plan, which Render expires after a while; see below).
+- **brewco-crm-app**: runs [`crm-service/build.sh`](crm-service/build.sh) (pip install → `npm run build` → `alembic upgrade head` → `python seed.py`), then gunicorn with 2 workers. In production there's no Vite server: `app/main.py` serves `frontend/dist/` itself, so the frontend and API share one URL.
+- **brewco-channel-app**: runs gunicorn with **1 worker**. It has to stay at 1, because `pending_callbacks` lives in memory and isn't shared between workers.
 
 The two services find each other through `RENDER_EXTERNAL_URL`. `OPENAI_API_KEY` and `APP_PASSWORD` must be set by hand in the dashboard.
 
@@ -357,9 +357,11 @@ flowchart TD
 
 **Things to know:**
 
-- **There are two seed scripts.** `crm-service/seed.py` (used on deploy) skips if customers already exist. `app/db/seed.py` (the one the README mentions, `python -m app.db.seed`) **always adds 200 more**. Running it twice is how a database ends up with 400 customers.
+- **There are two seed scripts.** `crm-service/seed.py` (used on deploy) skips if customers already exist. `app/db/seed.py` (`python -m app.db.seed`) **always adds 200 more**, so prefer `python seed.py`. Running it twice is how a database ends up with 400 customers.
 - **Deleting a segment** keeps its campaigns, but their `segment_id` becomes empty. A *draft* campaign whose segment was deleted will fail when launched.
 - **Password protection is one shared password**, not user accounts. Anyone who knows it has full access, so pick a long one and change it in Render if it leaks. Use the site over `https://` (Render's default), never plain `http://`, so the password isn't sent in the clear.
 - **Delivery is simulated.** Delivery, open and click outcomes are random, and the 15% conversion is decided by the CRM, not by real customer behaviour.
 - **Small timing overlap during launch:** each batch is marked `sent` right after the channel service accepts it. Delivery callbacks arrive at least 1 s later, so in practice they come after it. With a very slow database, a `delivered` update could be overwritten by `sent`.
+- **If delivery results never arrive on Render** (campaigns show 0 delivered), the two services can't reach each other. In Render, set `CHANNEL_SERVICE_URL` on brewco-crm-app to the channel service's `https://...onrender.com` address, and `CRM_CALLBACK_URL` on brewco-channel-app to the CRM's address. Also check both have the same `CALLBACK_SECRET`.
+- **Build fails with `Name or service not known` during migrations:** `DATABASE_URL` points at a database Render can't find. The free database may have expired, or it's in a different region. Copy the database's *Internal Database URL* into `DATABASE_URL`.
 - **Campaign launches run inside the API process.** If the CRM API restarts mid-launch, the remaining batches are not sent and the campaign stays `running`.
